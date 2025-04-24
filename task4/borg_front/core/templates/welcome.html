@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Welcome to Borg Connect</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #F5F7F8; /* Changed from #f0f9ff */
+            overflow-x: hidden;
+        }
+
+    /* Navigation Sidebar */
+    .sidebar {
+        height: 100%;
+        width: 0;
+        position: fixed;
+        top: 0;
+        left: 0;
+        background-color: #0a2647da; /* Deep navy */
+        overflow-x: hidden;
+        transition: 0.3s;
+        padding-top: 60px;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        z-index: 1000;
+      }
+  
+      .sidebar a {
+        padding: 15px 30px;
+        text-decoration: none;
+        font-size: 18px;
+        color: #FFFFFF; /* White text */
+        display: block;
+        transition: 0.2s;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+      }
+  
+      .sidebar a:hover {
+        background-color: #144272; /* Medium blue */
+      }
+  
+      .menu-btn {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        font-size: 30px;
+        color: #0A2647; /* Deep navy */
+        cursor: pointer;
+        z-index: 1001;
+        background: none;
+        border: none;
+        transition: color 0.2s;
+      }
+  
+      .menu-btn:hover {
+        color: #3AA6B9; /* Teal accent */
+      }  
+
+        .welcome-container {
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: #0A2647; /* Changed from #4a8b9d */
+            text-align: center;
+        }
+
+        .welcome-container h1 {
+            font-size: 60px;
+            margin: 0;
+            font-weight: 700;
+        }
+
+        .welcome-container h2 {
+            font-size: 32px;
+            font-weight: 300;
+            margin-top: 10px;
+            color: #3AA6B9; /* Changed from #6a9a8f */
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Hamburger Menu Button -->
+    <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <!-- Sidebar -->
+    <div id="mySidebar" class="sidebar">
+        <a href="/welcome/">Home</a>
+        <a href="/dashboard/">Dashboard</a>
+    </div>
+
+    <!-- Welcome Content -->
+    <div class="welcome-container">
+        <h1>Welcome to Borg Connect</h1>
+        <h2>Data Adapter Simulation</h2>
+    </div>
+
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById("mySidebar");
+            sidebar.style.width = sidebar.style.width === "250px" ? "0" : "250px";
+          }
+    </script>
+
+</body>
+</html>

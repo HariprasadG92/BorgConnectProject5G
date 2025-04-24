@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Borg Connect Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #F5F7F8; /* Light background */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px;
+      color: #333333; /* Dark text */
+    }
+
+    /* Navigation Sidebar */
+    .sidebar {
+      height: 100%;
+      width: 0;
+      position: fixed;
+      top: 0;
+      left: 0;
+      background-color: #0a2647da; /* Deep navy */
+      overflow-x: hidden;
+      transition: 0.3s;
+      padding-top: 60px;
+      box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+      z-index: 1000;
+    }
+
+    .sidebar a {
+      padding: 15px 30px;
+      text-decoration: none;
+      font-size: 18px;
+      color: #FFFFFF; /* White text */
+      display: block;
+      transition: 0.2s;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .sidebar a:hover {
+      background-color: #144272; /* Medium blue */
+    }
+
+    .menu-btn {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      font-size: 30px;
+      color: #0A2647; /* Deep navy */
+      cursor: pointer;
+      z-index: 1001;
+      background: none;
+      border: none;
+      transition: color 0.2s;
+    }
+
+    .menu-btn:hover {
+      color: #3AA6B9; /* Teal accent */
+    }
+
+    h1 {
+      color: #0A2647; /* Deep navy */
+      margin-bottom: 30px;
+      font-weight: 600;
+    }
+
+    .chart-container {
+      width: 100%;
+      max-width: 800px;
+      height: 400px;
+      background-color: #FFFFFF;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+      padding: 20px;
+      margin-bottom: 30px;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100% !important;
+    }
+
+    .controls {
+      margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .controls select,
+    .controls input {
+      padding: 12px 15px;
+      font-size: 16px;
+      border-radius: 6px;
+      border: 1px solid #E0E5EC;
+      background-color: #FFFFFF;
+      transition: border 0.3s;
+    }
+
+    .controls select:focus,
+    .controls input:focus {
+      outline: none;
+      border-color: #3AA6B9; /* Teal accent */
+    }
+
+    .controls button {
+      padding: 12px;
+      font-size: 16px;
+      font-weight: 500;
+      border-radius: 6px;
+      border: none;
+      background-color: #144272; /* Medium blue */
+      color: white;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-top: 10px;
+    }
+
+    .controls button:hover {
+      background-color: #2C74B3; /* Lighter blue */
+      transform: translateY(-1px);
+    }
+
+    .controls button:active {
+      transform: translateY(0);
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    #stopBtn {
+      background-color: #E74C3C; /* Red for stop */
+    }
+
+    #stopBtn:hover {
+      background-color: #C0392B;
+    }
+  </style>
+</head>
+<body>
+  <!-- Hamburger Menu Button -->
+  <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+
+  <!-- Sidebar -->
+  <div id="mySidebar" class="sidebar">
+    <a href="/welcome/">Home</a>
+    <a href="/dashboard/">Dashboard</a>
+  </div>
+
+  <h1>Data Monitoring Dashboard</h1>
+
+  <div class="chart-container">
+    <canvas id="myChart"></canvas>
+  </div>
+
+  <div class="controls">
+    <select id="samplingType">
+      <option value="">Select Sampling Type</option>
+      <option value="avg">Average</option>
+      <option value="sum">Sum</option>
+      <option value="min">Minimum</option>
+      <option value="max">Maximum</option>
+      <option value="latest">Latest</option>
+    </select>
+
+    <input type="number" id="samplingFreq" placeholder="Sampling Frequency (seconds)">
+
+    <div class="button-group">
+      <button onclick="startSampling()">Start Sampling</button>
+      <button id="stopBtn" onclick="stopSampling()">Stop</button>
+    </div>
+  </div>
+
+  <script>
+    function toggleSidebar() {
+      const sidebar = document.getElementById("mySidebar");
+      sidebar.style.width = sidebar.style.width === "250px" ? "0" : "250px";
+    }
+    
+    const ctx = document.getElementById('myChart').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Data Stream',
+          data: [],
+          borderColor: '#2C74B3', /* Medium blue */
+          backgroundColor: 'rgba(58, 166, 185, 0.1)', /* Teal with opacity */
+          borderWidth: 2,
+          fill: true,
+          tension: 0.3,
+          pointBackgroundColor: '#3AA6B9' /* Teal points */
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            grid: { 
+              color: 'rgba(0,0,0,0.05)',
+              drawBorder: false
+            },
+            beginAtZero: false
+          },
+          x: {
+            grid: { 
+              color: 'rgba(0,0,0,0.05)',
+              drawBorder: false
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: {
+              font: {
+                weight: 'bold'
+              }
+            }
+          }
+        }
+      }
+    });
+
+    let simulationRunning = false;
+    let sampleInterval = null;
+
+    function startSampling() {
+      const type = document.getElementById('samplingType').value;
+      const freq = parseInt(document.getElementById('samplingFreq').value);
+
+      if (!type || isNaN(freq) || freq <= 0) {
+        alert("Please enter valid sampling type and frequency.");
+        return;
+      }
+
+      if (simulationRunning) {
+        alert("Sampling already running.");
+        return;
+      }
+
+      simulationRunning = true;
+      console.log(`Starting with type: ${type}, freq: ${freq}s`);
+
+      sampleInterval = setInterval(() => {
+        const now = new Date().toLocaleTimeString();
+        const randomValue = Math.floor(Math.random() * 100); // Simulated data
+        chart.data.labels.push(now);
+        chart.data.datasets[0].data.push(randomValue);
+        chart.update();
+
+        // Keep only last 20 points
+        if (chart.data.labels.length > 20) {
+          chart.data.labels.shift();
+          chart.data.datasets[0].data.shift();
+        }
+      }, freq * 1000);
+    }
+
+    function stopSampling() {
+      if (!simulationRunning) {
+        alert("No active sampling to stop.");
+        return;
+      }
+
+      clearInterval(sampleInterval);
+      simulationRunning = false;
+      console.log("Sampling stopped.");
+    }
+  </script>
+</body>
+</html>
