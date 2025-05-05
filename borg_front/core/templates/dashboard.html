@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Borg Connect Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #F5F7F8; /* Light background */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px;
+      color: #333333; /* Dark text */
+    }
+
+    /* Navigation Sidebar */
+    .sidebar {
+      height: 100%;
+      width: 0;
+      position: fixed;
+      top: 0;
+      left: 0;
+      background-color: #0a2647da; /* Deep navy */
+      overflow-x: hidden;
+      transition: 0.3s;
+      padding-top: 60px;
+      box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+      z-index: 1000;
+    }
+
+    .sidebar a {
+      padding: 15px 30px;
+      text-decoration: none;
+      font-size: 18px;
+      color: #FFFFFF; /* White text */
+      display: block;
+      transition: 0.2s;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .sidebar a:hover {
+      background-color: #144272; /* Medium blue */
+    }
+
+    .menu-btn {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      font-size: 30px;
+      color: #0A2647; /* Deep navy */
+      cursor: pointer;
+      z-index: 1001;
+      background: none;
+      border: none;
+      transition: color 0.2s;
+    }
+
+    .menu-btn:hover {
+      color: #3AA6B9; /* Teal accent */
+    }
+
+    h1 {
+      color: #0A2647; /* Deep navy */
+      margin-bottom: 30px;
+      font-weight: 600;
+    }
+
+    .chart-container {
+      width: 100%;
+      max-width: 800px;
+      height: 400px;
+      background-color: #FFFFFF;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+      padding: 20px;
+      margin-bottom: 30px;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100% !important;
+    }
+
+    .controls {
+      margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .controls select,
+    .controls input {
+      padding: 12px 15px;
+      font-size: 16px;
+      border-radius: 6px;
+      border: 1px solid #E0E5EC;
+      background-color: #FFFFFF;
+      transition: border 0.3s;
+    }
+
+    .controls select:focus,
+    .controls input:focus {
+      outline: none;
+      border-color: #3AA6B9; /* Teal accent */
+    }
+
+    .controls button {
+      padding: 12px;
+      font-size: 16px;
+      font-weight: 500;
+      border-radius: 6px;
+      border: none;
+      background-color: #144272; /* Medium blue */
+      color: white;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-top: 10px;
+    }
+
+    .controls button:hover {
+      background-color: #2C74B3; /* Lighter blue */
+      transform: translateY(-1px);
+    }
+
+    .controls button:active {
+      transform: translateY(0);
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    #stopBtn {
+      background-color: #E74C3C; /* Red for stop */
+    }
+
+    #stopBtn:hover {
+      background-color: #C0392B;
+    }
+  </style>
+</head>
+<body>
+  <!-- Hamburger Menu Button -->
+  <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+
+  <!-- Sidebar -->
+  <div id="mySidebar" class="sidebar">
+    <a href="/welcome/">Home</a>
+    <a href="/dashboard/">Dashboard</a>
+  </div>
+
+  <h1>Data Monitoring Dashboard</h1>
+
+  <div class="chart-container">
+    <canvas id="myChart"></canvas>
+  </div>
+
+  <div class="controls">
+    <select id="samplingType">
+      <option value="">Select Sampling Type</option>
+      <option value="avg">Average</option>
+      <option value="sum">Sum</option>
+      <option value="min">Minimum</option>
+      <option value="max">Maximum</option>
+      <option value="latest">Latest</option>
+    </select>
+
+    <input type="number" id="samplingFreq" placeholder="Sampling Frequency (seconds)" min="1">
+
+    <div class="button-group">
+      <button onclick="startSampling()">Start Sampling</button>
+      <button id="stopBtn" onclick="stopSampling()">Stop</button>
+    </div>
+  </div>
+
+  <script>
+    // Global variables for auto-reload
+    let reloadInterval = null;
+
+    function toggleSidebar() {
+      const sidebar = document.getElementById("mySidebar");
+      sidebar.style.width = sidebar.style.width === "250px" ? "0" : "250px";
+    }
+
+    // Initialize WebSocket
+    const dashboardSocket = new WebSocket(
+      'ws://' + window.location.host + '/ws/dashboard/'
+    );
+
+    // Chart initialization
+    const ctx = document.getElementById('myChart').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Aggregated Data',
+          data: [],
+          borderColor: '#2C74B3',
+          backgroundColor: 'rgba(58, 166, 185, 0.1)',
+          borderWidth: 2,
+          fill: true,
+          tension: 0.3,
+          pointBackgroundColor: '#3AA6B9'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            grid: { 
+              color: 'rgba(0,0,0,0.05)',
+              drawBorder: false
+            },
+            beginAtZero: false
+          },
+          x: {
+            grid: { 
+              color: 'rgba(0,0,0,0.05)',
+              drawBorder: false
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: {
+              font: {
+                weight: 'bold'
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Save settings to localStorage
+    function saveSettingsToLocal(type, freq) {
+      localStorage.setItem('dashboardSettings', JSON.stringify({
+        sampling_type: type,
+        sampling_freq: freq
+      }));
+    }
+
+    // Load settings from localStorage
+    function loadSettingsFromLocal() {
+      const settings = localStorage.getItem('dashboardSettings');
+      if (settings) {
+        return JSON.parse(settings);
+      }
+      return null;
+    }
+
+    // Set initial values
+    document.addEventListener('DOMContentLoaded', function() {
+      // Try to load from localStorage first
+      const localSettings = loadSettingsFromLocal();
+      
+      if (localSettings) {
+        document.getElementById('samplingType').value = localSettings.sampling_type;
+        document.getElementById('samplingFreq').value = localSettings.sampling_freq;
+      } else {
+        // Fall back to Django context if no localStorage settings
+        const currentSettings = JSON.parse('{{ current_settings|escapejs }}');
+        if (currentSettings.sampling_type) {
+          document.getElementById('samplingType').value = currentSettings.sampling_type;
+        }
+        if (currentSettings.sampling_freq) {
+          document.getElementById('samplingFreq').value = currentSettings.sampling_freq;
+        }
+      }
+
+      // Check if we should start auto-reload (if sampling is running)
+      checkAutoReload();
+    });
+
+    // WebSocket message handling
+    dashboardSocket.onmessage = function(e) {
+      const data = JSON.parse(e.data);
+      
+      if (data.type === 'initial_data') {
+        // Clear existing data
+        chart.data.labels = [];
+        chart.data.datasets[0].data = [];
+        
+        // Add initial data points
+        data.data.forEach(item => {
+          const date = new Date(item.timestamp * 1000);
+          chart.data.labels.push(date.toLocaleTimeString());
+          chart.data.datasets[0].data.push(item.value);
+        });
+        
+        chart.update();
+      } else {
+        // Add new data point
+        const date = new Date(data.timestamp * 1000);
+        chart.data.labels.push(date.toLocaleTimeString());
+        chart.data.datasets[0].data.push(data.value);
+        
+        // Keep only last 20 points
+        if (chart.data.labels.length > 20) {
+          chart.data.labels.shift();
+          chart.data.datasets[0].data.shift();
+        }
+        
+        chart.update();
+      }
+    };
+
+    // Auto-reload functions
+    function startAutoReload(frequency) {
+      if (reloadInterval) {
+        clearInterval(reloadInterval);
+      }
+      
+      // Convert seconds to milliseconds
+      const intervalMs = frequency * 1000;
+      
+      reloadInterval = setInterval(() => {
+        window.location.reload();
+      }, intervalMs);
+      
+      console.log(`Auto-reload started with ${frequency} second interval`);
+    }
+
+    function stopAutoReload() {
+      if (reloadInterval) {
+        clearInterval(reloadInterval);
+        reloadInterval = null;
+        console.log('Auto-reload stopped');
+      }
+    }
+
+    function checkAutoReload() {
+      // Check Redis via API to see if we should auto-reload
+      axios.get('/get_settings/')
+        .then(response => {
+          if (response.data.status === 'running') {
+            startAutoReload(response.data.sampling_freq);
+          } else {
+            stopAutoReload();
+          }
+        })
+        .catch(error => {
+          console.error('Error checking settings:', error);
+        });
+    }
+
+    // Main control functions
+    function startSampling() {
+      const type = document.getElementById('samplingType').value;
+      const freq = parseInt(document.getElementById('samplingFreq').value);
+
+      if (!type || isNaN(freq) || freq <= 0) {
+        alert("Please enter valid sampling type and frequency.");
+        return;
+      }
+
+      // Save to localStorage
+      saveSettingsToLocal(type, freq);
+
+      // Save settings to Redis via Django view
+      axios.post('/update_settings/', {
+        sampling_type: type,
+        sampling_freq: freq,
+        status: 'running'
+      })
+      .then(response => {
+        console.log('Sampling started with settings:', response.data);
+        startAutoReload(freq);
+      })
+      .catch(error => {
+        console.error('Error starting sampling:', error);
+      });
+    }
+
+    function stopSampling() {
+      axios.post('/update_settings/', {
+        status: 'stopped'
+      })
+      .then(response => {
+        console.log('Sampling stopped');
+        stopAutoReload();
+      })
+      .catch(error => {
+        console.error('Error stopping sampling:', error);
+      });
+    }
+
+    // Handle beforeunload to clean up
+    window.addEventListener('beforeunload', function() {
+      if (reloadInterval) {
+        stopAutoReload();
+      }
+    });
+  </script>
+</body>
+</html>
